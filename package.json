@@ -1,0 +1,19 @@
+{
+  "name": "slack-scheduler",
+  "version": "1.0.0",
+  "description": "Personal tool that automatically changes a Slack status on a schedule",
+  "main": "scheduler/index.js",
+  "scripts": {
+    "start": "node scheduler/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dayjs": "^1.11.0",
+    "dotenv": "^16.0.0",
+    "node-cron": "^3.0.0",
+    "open": "^8.4.2"
+  }
+}

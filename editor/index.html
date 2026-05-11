@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slack Status Scheduler — Editor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a1d27;
+      color: #fff;
+      padding: 16px 24px;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+
+    header p {
+      font-size: 12px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    main {
+      max-width: 820px;
+      margin: 32px auto;
+      padding: 0 16px 64px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .section-header h2 {
+      font-size: 11px;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .btn-add {
+      background: #4f6ef7;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-add:hover { background: #3d5be0; }
+
+    /* ── Rule card ─────────────────────────────────────────── */
+
+    .rule-card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04);
+      padding: 16px 16px 16px 18px;
+      margin-bottom: 10px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .rule-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── Day pills ─────────────────────────────────────────── */
+
+    .day-pills {
+      display: flex;
+      gap: 6px;
+    }
+
+    .pill {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1.5px solid #d5d9e0;
+      background: #fff;
+      color: #888;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.12s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+
+    .pill:hover:not(.active) {
+      border-color: #4f6ef7;
+      color: #4f6ef7;
+    }
+
+    .pill.active {
+      background: #4f6ef7;
+      border-color: #4f6ef7;
+      color: #fff;
+    }
+
+    /* ── Fields row ────────────────────────────────────────── */
+
+    .fields-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .emoji-input {
+      width: 120px;
+      padding: 7px 10px;
+      border: 1.5px solid #d5d9e0;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: 'Courier New', monospace;
+      transition: border-color 0.12s;
+    }
+
+    .text-input {
+      flex: 1;
+      min-width: 140px;
+      padding: 7px 10px;
+      border: 1.5px solid #d5d9e0;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: border-color 0.12s;
+    }
+
+    .emoji-input:focus, .text-input:focus {
+      outline: none;
+      border-color: #4f6ef7;
+      box-shadow: 0 0 0 3px rgba(79,110,247,0.12);
+    }
+
+    /* ── Toggle ────────────────────────────────────────────── */
+
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      user-select: none;
+      font-size: 12px;
+      color: #777;
+      white-space: nowrap;
+    }
+
+    .toggle-cb {
+      width: 32px;
+      height: 18px;
+      appearance: none;
+      -webkit-appearance: none;
+      background: #d5d9e0;
+      border-radius: 9px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+
+    .toggle-cb::after {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: left 0.15s;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+
+    .toggle-cb:checked { background: #4f6ef7; }
+    .toggle-cb:checked::after { left: 16px; }
+
+    /* ── Time row ──────────────────────────────────────────── */
+
+    .time-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .time-row.hidden { display: none; }
+
+    .time-row select {
+      padding: 7px 8px;
+      border: 1.5px solid #d5d9e0;
+      border-radius: 6px;
+      font-size: 13px;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.12s;
+    }
+
+    .time-row select:focus {
+      outline: none;
+      border-color: #4f6ef7;
+      box-shadow: 0 0 0 3px rgba(79,110,247,0.12);
+    }
+
+    .time-sep {
+      font-size: 13px;
+      color: #bbb;
+    }
+
+    /* ── Delete button ─────────────────────────────────────── */
+
+    .btn-delete {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #ccc;
+      padding: 4px;
+      border-radius: 5px;
+      transition: color 0.12s, background 0.12s;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .btn-delete:hover {
+      color: #e53e3e;
+      background: #fff5f5;
+    }
+
+    .btn-delete svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    /* ── Empty state ───────────────────────────────────────── */
+
+    .empty-state {
+      text-align: center;
+      padding: 36px 20px;
+      color: #bbb;
+      font-size: 14px;
+      background: #fff;
+      border-radius: 10px;
+      border: 2px dashed #e4e7ec;
+    }
+
+    /* ── Expired card ──────────────────────────────────────── */
+
+    .rule-card.expired {
+      opacity: 0.55;
+      background: #f9f9f9;
+    }
+
+    .expired-badge {
+      font-size: 10px;
+      font-weight: 700;
+      color: #999;
+      background: #ebebeb;
+      border-radius: 4px;
+      padding: 2px 6px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      align-self: center;
+      white-space: nowrap;
+    }
+
+    /* ── Date input ────────────────────────────────────────── */
+
+    .date-input {
+      padding: 7px 10px;
+      border: 1.5px solid #d5d9e0;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: border-color 0.12s;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .date-input:focus {
+      outline: none;
+      border-color: #4f6ef7;
+      box-shadow: 0 0 0 3px rgba(79,110,247,0.12);
+    }
+
+    /* ── Export panel ──────────────────────────────────────── */
+
+    .export-panel {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04);
+      overflow: hidden;
+    }
+
+    .export-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid #f0f0f0;
+      flex-wrap: wrap;
+    }
+
+    .tz-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #666;
+    }
+
+    .tz-input {
+      padding: 6px 10px;
+      border: 1.5px solid #d5d9e0;
+      border-radius: 6px;
+      font-size: 13px;
+      width: 160px;
+      transition: border-color 0.12s;
+    }
+
+    .tz-input:focus {
+      outline: none;
+      border-color: #4f6ef7;
+      box-shadow: 0 0 0 3px rgba(79,110,247,0.12);
+    }
+
+    .export-actions {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+      flex-wrap: wrap;
+    }
+
+    .btn-secondary {
+      background: #fff;
+      color: #444;
+      border: 1.5px solid #d5d9e0;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.12s;
+      white-space: nowrap;
+    }
+
+    .btn-secondary:hover {
+      border-color: #4f6ef7;
+      color: #4f6ef7;
+    }
+
+    .json-preview {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      padding: 16px;
+      background: #fafafa;
+      color: #333;
+      white-space: pre;
+      overflow: auto;
+      max-height: 400px;
+      margin: 0;
+      display: block;
+    }
+
+    /* ── Simulator panel ────────────────────────────────────── */
+
+    .sim-panel {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04);
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .sim-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .sim-time-select {
+      padding: 7px 8px;
+      border: 1.5px solid #d5d9e0;
+      border-radius: 6px;
+      font-size: 13px;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.12s;
+    }
+
+    .sim-time-select:focus {
+      outline: none;
+      border-color: #4f6ef7;
+      box-shadow: 0 0 0 3px rgba(79,110,247,0.12);
+    }
+
+    .sim-result {
+      flex: 1;
+      min-width: 180px;
+      font-size: 14px;
+      padding: 9px 14px;
+      border-radius: 6px;
+      background: #f5f7ff;
+      border: 1.5px solid #dde3ff;
+      color: #333;
+    }
+
+    .sim-result.no-match {
+      color: #aaa;
+      background: #fafafa;
+      border-color: #eee;
+    }
+
+    /* ── Validation ────────────────────────────────────────── */
+
+    .rule-card.invalid {
+      box-shadow: 0 1px 3px rgba(245,101,101,0.2), 0 0 0 1.5px #f56565;
+    }
+
+    .btn-secondary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ── Path bar ───────────────────────────────────────────── */
+
+    .path-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 16px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .path-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    .path-input {
+      flex: 1;
+      padding: 5px 10px;
+      border: 1.5px solid #e8eaed;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      background: #f7f8fa;
+      color: #555;
+      cursor: default;
+    }
+
+    .btn-browse {
+      background: #fff;
+      border: 1.5px solid #d5d9e0;
+      border-radius: 6px;
+      padding: 4px 9px;
+      cursor: pointer;
+      color: #666;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      transition: all 0.12s;
+    }
+
+    .btn-browse:hover {
+      border-color: #4f6ef7;
+      color: #4f6ef7;
+    }
+
+    .btn-browse svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* ── Toast ──────────────────────────────────────────────── */
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: #1a1d27;
+      color: #fff;
+      font-size: 13px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      z-index: 9999;
+      max-width: 480px;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .toast.toast-show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Slack Status Scheduler</h1>
+  <p>Visual editor — Load a config file, edit, then Save to write it back.</p>
+</header>
+
+<main>
+  <section>
+    <div class="section-header">
+      <h2>Weekly Rules</h2>
+      <button class="btn-add" id="add-weekly">+ Add rule</button>
+    </div>
+    <div id="weekly-list"></div>
+  </section>
+
+  <section style="margin-top: 32px;">
+    <div class="section-header">
+      <h2>Once Entries</h2>
+      <button class="btn-add" id="add-once">+ Add entry</button>
+    </div>
+    <div id="once-list"></div>
+  </section>
+
+  <section style="margin-top: 32px;">
+    <div class="section-header">
+      <h2>Preview Simulator</h2>
+    </div>
+    <div class="sim-panel">
+      <div class="sim-controls">
+        <div id="sim-day-pills" class="day-pills"></div>
+        <select id="sim-time" class="sim-time-select"></select>
+      </div>
+      <div id="sim-result" class="sim-result no-match">No active status</div>
+    </div>
+  </section>
+
+  <section style="margin-top: 32px;">
+    <div class="section-header">
+      <h2>Config</h2>
+    </div>
+    <div class="export-panel">
+      <div class="path-bar">
+        <span class="path-label">File</span>
+        <input type="text" id="config-path" class="path-input"
+               placeholder="No file loaded — click Browse to pick one" readonly>
+        <button type="button" id="btn-browse" class="btn-browse" title="Browse for config file">
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+          </svg>
+        </button>
+        <input type="file" id="file-input" accept=".json" style="display:none">
+      </div>
+      <div class="export-toolbar">
+        <div class="tz-field">
+          <label for="timezone-input">Timezone</label>
+          <input type="text" id="timezone-input" class="tz-input" value="Europe/Madrid">
+        </div>
+        <div class="export-actions">
+          <button type="button" id="btn-load"   class="btn-secondary">Reload</button>
+          <button type="button" id="btn-save"   class="btn-secondary">Save</button>
+          <button type="button" id="btn-copy"   class="btn-secondary">Copy JSON</button>
+          <button type="button" id="btn-export" class="btn-secondary">Export</button>
+        </div>
+      </div>
+      <pre id="json-preview" class="json-preview"></pre>
+    </div>
+  </section>
+</main>
+
+<script>
+  // ── In-memory config ────────────────────────────────────────
+  const config = {
+    timezone: 'Europe/Madrid',
+    weekly: [],
+    once: [],
+  };
+
+  const FSAA = typeof window.showOpenFilePicker === 'function';
+  let fileHandle = null;
+  let lastFile   = null;
+
+  // ── Constants ───────────────────────────────────────────────
+  const DAY_PILLS = [
+    { label: 'L', value: 'monday' },
+    { label: 'M', value: 'tuesday' },
+    { label: 'X', value: 'wednesday' },
+    { label: 'J', value: 'thursday' },
+    { label: 'V', value: 'friday' },
+    { label: 'S', value: 'saturday' },
+    { label: 'D', value: 'sunday' },
+  ];
+
+  const TIME_OPTIONS = (() => {
+    const opts = [];
+    for (let h = 0; h < 24; h++) {
+      for (const m of [0, 15, 30, 45]) {
+        opts.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+      }
+    }
+    return opts;
+  })();
+
+  // ── Helpers ─────────────────────────────────────────────────
+  function todayStr() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  // ── IndexedDB (file handle persistence) ─────────────────────
+  const IDB_NAME  = 'slack-scheduler-editor';
+  const IDB_STORE = 'handles';
+
+  function openIDB() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror   = () => reject(req.error);
+    });
+  }
+
+  async function getStoredHandle() {
+    try {
+      const db = await openIDB();
+      return await new Promise((resolve) => {
+        const req = db.transaction(IDB_STORE).objectStore(IDB_STORE).get('configFile');
+        req.onsuccess = () => resolve(req.result ?? null);
+        req.onerror   = () => resolve(null);
+      });
+    } catch { return null; }
+  }
+
+  async function storeHandle(handle) {
+    try {
+      const db = await openIDB();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).put(handle, 'configFile');
+        tx.oncomplete = resolve;
+        tx.onerror    = reject;
+      });
+    } catch { /* non-fatal */ }
+  }
+
+  // ── File operations ─────────────────────────────────────────
+  function setPathDisplay(name) {
+    localStorage.setItem('configFileName', name);
+    document.getElementById('config-path').value = name;
+  }
+
+  async function applyFile(file) {
+    try {
+      const loaded = JSON.parse(await file.text());
+      Object.assign(config, loaded);
+      config.weekly   = Array.isArray(loaded.weekly) ? loaded.weekly : [];
+      config.once     = Array.isArray(loaded.once)   ? loaded.once   : [];
+      config.timezone = loaded.timezone || config.timezone;
+      document.getElementById('timezone-input').value = config.timezone;
+      renderWeekly();
+      renderOnce();
+    } catch (err) {
+      alert('Could not parse JSON: ' + err.message);
+    }
+  }
+
+  async function browseFile() {
+    if (FSAA) {
+      try {
+        [fileHandle] = await window.showOpenFilePicker({
+          types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+        });
+        await storeHandle(fileHandle);
+        const file = await fileHandle.getFile();
+        lastFile = file;
+        setPathDisplay(file.name);
+        await applyFile(file);
+      } catch (err) {
+        if (err.name !== 'AbortError') alert('Could not open file: ' + err.message);
+      }
+    } else {
+      document.getElementById('file-input').click();
+    }
+  }
+
+  async function reloadConfig() {
+    if (fileHandle) {
+      try {
+        const perm = await fileHandle.requestPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') return;
+        lastFile = await fileHandle.getFile();
+        await applyFile(lastFile);
+      } catch (err) {
+        alert('Could not reload file: ' + err.message);
+      }
+    } else if (lastFile) {
+      await applyFile(lastFile);
+    } else {
+      alert('No file loaded. Click Browse (📁) to pick one first.');
+    }
+  }
+
+  async function saveConfig() {
+    if (fileHandle) {
+      try {
+        const perm = await fileHandle.requestPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') return;
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(config, null, 2));
+        await writable.close();
+        const btn = document.getElementById('btn-save');
+        btn.textContent = 'Saved!';
+        setTimeout(() => { btn.textContent = 'Save'; }, 1500);
+      } catch (err) {
+        alert('Could not save: ' + err.message);
+      }
+    } else if (typeof window.showSaveFilePicker === 'function') {
+      try {
+        const name = localStorage.getItem('configFileName') || 'config.json';
+        const h = await window.showSaveFilePicker({ suggestedName: name });
+        const writable = await h.createWritable();
+        await writable.write(JSON.stringify(config, null, 2));
+        await writable.close();
+        const btn = document.getElementById('btn-save');
+        btn.textContent = 'Saved!';
+        setTimeout(() => { btn.textContent = 'Save'; }, 1500);
+      } catch (err) {
+        if (err.name !== 'AbortError') alert('Could not save: ' + err.message);
+      }
+    } else {
+      exportConfig();
+      showToast('Direct save is not available in this browser. Config downloaded to your Downloads folder — replace the original config.json with it.');
+    }
+  }
+
+  function showToast(msg) {
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('toast-show'));
+    setTimeout(() => {
+      t.classList.remove('toast-show');
+      setTimeout(() => t.remove(), 300);
+    }, 4000);
+  }
+
+  function exportConfig() {
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'config.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function copyConfig() {
+    await navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+    const btn = document.getElementById('btn-copy');
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy JSON'; }, 1500);
+  }
+
+  function buildTimeSelect(selected) {
+    const sel = document.createElement('select');
+    for (const t of TIME_OPTIONS) {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      if (t === selected) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    return sel;
+  }
+
+  function updatePreview() {
+    document.getElementById('json-preview').textContent = JSON.stringify(config, null, 2);
+    runSimulator();
+    runValidation();
+  }
+
+  function floorTo15(hhmm) {
+    const [h, m] = hhmm.split(':');
+    const floored = Math.floor(parseInt(m, 10) / 15) * 15;
+    return `${h}:${floored.toString().padStart(2, '0')}`;
+  }
+
+  function simulate(day, time) {
+    const t = floorTo15(time);
+    for (const rule of config.weekly) {
+      if (rule.days.includes(day) && rule.from && t >= rule.from && t < rule.to)
+        return rule;
+    }
+    for (const rule of config.weekly) {
+      if (rule.days.includes(day) && !rule.from)
+        return rule;
+    }
+    return null;
+  }
+
+  function runSimulator() {
+    const activePill = document.querySelector('#sim-day-pills .pill.active');
+    const timeSelect = document.getElementById('sim-time');
+    const resultEl   = document.getElementById('sim-result');
+    if (!activePill || !timeSelect || !resultEl) return;
+
+    const rule = simulate(activePill.dataset.day, timeSelect.value);
+    if (rule) {
+      resultEl.textContent = `${rule.emoji}  ${rule.text}`;
+      resultEl.classList.remove('no-match');
+    } else {
+      resultEl.textContent = 'No active status';
+      resultEl.classList.add('no-match');
+    }
+  }
+
+  function runValidation() {
+    let allValid = true;
+
+    for (const rule of config.weekly) {
+      const card = document.querySelector(`.rule-card[data-id="${rule.id}"]`);
+      if (!card) continue;
+      const invalid = rule.days.length === 0
+        || !rule.emoji.trim()
+        || !rule.text.trim()
+        || !!(rule.from && rule.to && rule.from >= rule.to);
+      card.classList.toggle('invalid', invalid);
+      if (invalid) allValid = false;
+    }
+
+    for (const entry of config.once) {
+      const card = document.querySelector(`.rule-card[data-id="${entry.id}"]`);
+      if (!card) continue;
+      const invalid = !entry.emoji.trim()
+        || !entry.text.trim()
+        || !!(entry.from && entry.to && entry.from >= entry.to);
+      card.classList.toggle('invalid', invalid);
+      if (invalid) allValid = false;
+    }
+
+    document.getElementById('btn-save').disabled   = !allValid;
+    document.getElementById('btn-export').disabled = !allValid;
+    document.getElementById('btn-copy').disabled   = !allValid;
+  }
+
+  function initSimulator() {
+    const pillsContainer = document.getElementById('sim-day-pills');
+    for (const { label, value } of DAY_PILLS) {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'pill';
+      pill.textContent = label;
+      pill.title = value.charAt(0).toUpperCase() + value.slice(1);
+      pill.dataset.day = value;
+      pill.addEventListener('click', () => {
+        pillsContainer.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        runSimulator();
+      });
+      pillsContainer.appendChild(pill);
+    }
+    pillsContainer.firstElementChild.classList.add('active');
+
+    const timeSelect = document.getElementById('sim-time');
+    for (const t of TIME_OPTIONS) {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t;
+      timeSelect.appendChild(opt);
+    }
+    timeSelect.value = '09:00';
+    timeSelect.addEventListener('change', runSimulator);
+  }
+
+  // ── Render ──────────────────────────────────────────────────
+  function renderWeekly() {
+    const list = document.getElementById('weekly-list');
+    list.innerHTML = '';
+
+    if (config.weekly.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = 'No weekly rules yet. Click "+ Add rule" to create one.';
+      list.appendChild(empty);
+      updatePreview();
+      return;
+    }
+
+    for (const rule of config.weekly) {
+      list.appendChild(buildRuleCard(rule));
+    }
+    updatePreview();
+  }
+
+  function buildRuleCard(rule) {
+    const card = document.createElement('div');
+    card.className = 'rule-card';
+    card.dataset.id = rule.id;
+
+    const body = document.createElement('div');
+    body.className = 'rule-body';
+
+    // ── Day pills ──
+    const pillsRow = document.createElement('div');
+    pillsRow.className = 'day-pills';
+
+    for (const { label, value } of DAY_PILLS) {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'pill' + (rule.days.includes(value) ? ' active' : '');
+      pill.textContent = label;
+      pill.title = value.charAt(0).toUpperCase() + value.slice(1);
+      pill.addEventListener('click', () => {
+        const idx = rule.days.indexOf(value);
+        if (idx === -1) rule.days.push(value);
+        else rule.days.splice(idx, 1);
+        pill.classList.toggle('active');
+        updatePreview();
+      });
+      pillsRow.appendChild(pill);
+    }
+    body.appendChild(pillsRow);
+
+    // ── Fields row ──
+    const fieldsRow = document.createElement('div');
+    fieldsRow.className = 'fields-row';
+
+    const emojiInput = document.createElement('input');
+    emojiInput.type = 'text';
+    emojiInput.className = 'emoji-input';
+    emojiInput.placeholder = ':emoji:';
+    emojiInput.value = rule.emoji || '';
+    emojiInput.addEventListener('input', () => { rule.emoji = emojiInput.value; updatePreview(); });
+
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.className = 'text-input';
+    textInput.placeholder = 'Status text';
+    textInput.value = rule.text || '';
+    textInput.addEventListener('input', () => { rule.text = textInput.value; updatePreview(); });
+
+    const toggleLabel = document.createElement('label');
+    toggleLabel.className = 'toggle-label';
+    const toggleCb = document.createElement('input');
+    toggleCb.type = 'checkbox';
+    toggleCb.className = 'toggle-cb';
+    toggleCb.checked = !!(rule.from && rule.to);
+    const toggleSpan = document.createElement('span');
+    toggleSpan.textContent = 'Time range';
+    toggleLabel.appendChild(toggleCb);
+    toggleLabel.appendChild(toggleSpan);
+
+    fieldsRow.appendChild(emojiInput);
+    fieldsRow.appendChild(textInput);
+    fieldsRow.appendChild(toggleLabel);
+    body.appendChild(fieldsRow);
+
+    // ── Time row ──
+    const timeRow = document.createElement('div');
+    timeRow.className = 'time-row' + (toggleCb.checked ? '' : ' hidden');
+
+    const fromSelect = buildTimeSelect(rule.from || '09:00');
+    fromSelect.addEventListener('change', () => { rule.from = fromSelect.value; updatePreview(); });
+
+    const sep = document.createElement('span');
+    sep.className = 'time-sep';
+    sep.textContent = '→';
+
+    const toSelect = buildTimeSelect(rule.to || '10:00');
+    toSelect.addEventListener('change', () => { rule.to = toSelect.value; updatePreview(); });
+
+    timeRow.appendChild(fromSelect);
+    timeRow.appendChild(sep);
+    timeRow.appendChild(toSelect);
+    body.appendChild(timeRow);
+
+    toggleCb.addEventListener('change', () => {
+      if (toggleCb.checked) {
+        timeRow.classList.remove('hidden');
+        rule.from = fromSelect.value;
+        rule.to = toSelect.value;
+      } else {
+        timeRow.classList.add('hidden');
+        delete rule.from;
+        delete rule.to;
+      }
+      updatePreview();
+    });
+
+    card.appendChild(body);
+
+    // ── Delete button ──
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn-delete';
+    delBtn.title = 'Delete rule';
+    delBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/>
+    </svg>`;
+    delBtn.addEventListener('click', () => {
+      config.weekly.splice(config.weekly.findIndex(r => r.id === rule.id), 1);
+      renderWeekly();
+    });
+    card.appendChild(delBtn);
+
+    return card;
+  }
+
+  // ── Once entries ────────────────────────────────────────────
+  function renderOnce() {
+    const list = document.getElementById('once-list');
+    list.innerHTML = '';
+
+    if (config.once.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.textContent = 'No once entries yet. Click "+ Add entry" to create one.';
+      list.appendChild(empty);
+      updatePreview();
+      return;
+    }
+
+    for (const entry of config.once) {
+      list.appendChild(buildOnceCard(entry));
+    }
+    updatePreview();
+  }
+
+  function buildOnceCard(entry) {
+    const card = document.createElement('div');
+    card.className = 'rule-card' + (entry.date < todayStr() ? ' expired' : '');
+    card.dataset.id = entry.id;
+
+    const body = document.createElement('div');
+    body.className = 'rule-body';
+
+    // ── Fields row ──
+    const fieldsRow = document.createElement('div');
+    fieldsRow.className = 'fields-row';
+
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.className = 'date-input';
+    dateInput.value = entry.date || todayStr();
+
+    const badge = document.createElement('span');
+    badge.className = 'expired-badge';
+    badge.textContent = 'Expired';
+    badge.style.display = card.classList.contains('expired') ? '' : 'none';
+
+    dateInput.addEventListener('change', () => {
+      entry.date = dateInput.value;
+      const isExpired = entry.date < todayStr();
+      card.classList.toggle('expired', isExpired);
+      badge.style.display = isExpired ? '' : 'none';
+      updatePreview();
+    });
+
+    const emojiInput = document.createElement('input');
+    emojiInput.type = 'text';
+    emojiInput.className = 'emoji-input';
+    emojiInput.placeholder = ':emoji:';
+    emojiInput.value = entry.emoji || '';
+    emojiInput.addEventListener('input', () => { entry.emoji = emojiInput.value; updatePreview(); });
+
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.className = 'text-input';
+    textInput.placeholder = 'Status text';
+    textInput.value = entry.text || '';
+    textInput.addEventListener('input', () => { entry.text = textInput.value; updatePreview(); });
+
+    const toggleLabel = document.createElement('label');
+    toggleLabel.className = 'toggle-label';
+    const toggleCb = document.createElement('input');
+    toggleCb.type = 'checkbox';
+    toggleCb.className = 'toggle-cb';
+    toggleCb.checked = !!(entry.from && entry.to);
+    const toggleSpan = document.createElement('span');
+    toggleSpan.textContent = 'Time range';
+    toggleLabel.appendChild(toggleCb);
+    toggleLabel.appendChild(toggleSpan);
+
+    fieldsRow.appendChild(dateInput);
+    fieldsRow.appendChild(badge);
+    fieldsRow.appendChild(emojiInput);
+    fieldsRow.appendChild(textInput);
+    fieldsRow.appendChild(toggleLabel);
+    body.appendChild(fieldsRow);
+
+    // ── Time row ──
+    const timeRow = document.createElement('div');
+    timeRow.className = 'time-row' + (toggleCb.checked ? '' : ' hidden');
+
+    const fromSelect = buildTimeSelect(entry.from || '09:00');
+    fromSelect.addEventListener('change', () => { entry.from = fromSelect.value; updatePreview(); });
+
+    const sep = document.createElement('span');
+    sep.className = 'time-sep';
+    sep.textContent = '→';
+
+    const toSelect = buildTimeSelect(entry.to || '10:00');
+    toSelect.addEventListener('change', () => { entry.to = toSelect.value; updatePreview(); });
+
+    timeRow.appendChild(fromSelect);
+    timeRow.appendChild(sep);
+    timeRow.appendChild(toSelect);
+    body.appendChild(timeRow);
+
+    toggleCb.addEventListener('change', () => {
+      if (toggleCb.checked) {
+        timeRow.classList.remove('hidden');
+        entry.from = fromSelect.value;
+        entry.to = toSelect.value;
+      } else {
+        timeRow.classList.add('hidden');
+        delete entry.from;
+        delete entry.to;
+      }
+      updatePreview();
+    });
+
+    card.appendChild(body);
+
+    // ── Delete button ──
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn-delete';
+    delBtn.title = 'Delete entry';
+    delBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/>
+    </svg>`;
+    delBtn.addEventListener('click', () => {
+      config.once.splice(config.once.findIndex(e => e.id === entry.id), 1);
+      renderOnce();
+    });
+    card.appendChild(delBtn);
+
+    return card;
+  }
+
+  // ── Add rule ────────────────────────────────────────────────
+  document.getElementById('add-weekly').addEventListener('click', () => {
+    config.weekly.push({
+      id: crypto.randomUUID(),
+      emoji: '',
+      text: '',
+      days: [],
+    });
+    renderWeekly();
+    document.getElementById('weekly-list').lastElementChild
+      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+
+  // ── Add entry ───────────────────────────────────────────────
+  document.getElementById('add-once').addEventListener('click', () => {
+    config.once.push({
+      id: crypto.randomUUID(),
+      emoji: '',
+      text: '',
+      date: todayStr(),
+    });
+    renderOnce();
+    document.getElementById('once-list').lastElementChild
+      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+
+  // ── Timezone ─────────────────────────────────────────────────
+  document.getElementById('timezone-input').addEventListener('input', () => {
+    config.timezone = document.getElementById('timezone-input').value;
+    updatePreview();
+  });
+
+  // ── Button listeners ─────────────────────────────────────────
+  document.getElementById('btn-browse').addEventListener('click', browseFile);
+  document.getElementById('btn-load').addEventListener('click', reloadConfig);
+  document.getElementById('btn-save').addEventListener('click', saveConfig);
+  document.getElementById('btn-export').addEventListener('click', exportConfig);
+  document.getElementById('btn-copy').addEventListener('click', copyConfig);
+
+  // Fallback for browsers without FSAA
+  document.getElementById('file-input').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    lastFile = file;
+    setPathDisplay(file.name);
+    await applyFile(file);
+    e.target.value = '';
+  });
+
+  // ── Init ────────────────────────────────────────────────────
+  renderWeekly();
+  renderOnce();
+  initSimulator();
+  updatePreview();
+
+  // Restore file association from previous session
+  (async () => {
+    const name = localStorage.getItem('configFileName');
+    if (name) document.getElementById('config-path').value = name;
+    fileHandle = await getStoredHandle();
+  })();
+</script>
+</body>
+</html>

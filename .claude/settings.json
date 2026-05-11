@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm install *)",
+      "Bash(npm run test)",
+      "Bash(npm run lint)",
+      "Bash(node --check *)",
+      "Bash(pm2 list)",
+      "Bash(pm2 status)",
+      "Bash(pm2 logs *)",
+      "Bash(pm2 show *)"
+    ]
+  }
+}
