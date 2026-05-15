@@ -40,14 +40,24 @@ copy .env.example .env
 
 ## Getting a Slack User Token
 
-The service needs a **User Token** (starts with `xoxp-`) with the `users.profile:write` scope. Bot tokens will not work — Slack requires a user token to set a user's own status.
+The service needs a **User Token** (starts with `xoxp-`). Bot tokens will not work — Slack requires a user token to set a user's own status, presence, and DND.
+
+### Required scopes
+
+| Scope | Unlocks |
+|---|---|
+| `users.profile:write` | Setting status emoji, text, and expiration |
+| `users:write` | Controlling presence (`away` / `auto`) |
+| `dnd:write` | Starting and ending notification snooze |
 
 1. Go to [api.slack.com/apps](https://api.slack.com/apps) and click **Create New App → From scratch**.
 2. Give it a name (e.g. "Status Scheduler") and pick your workspace.
 3. In the left sidebar, go to **OAuth & Permissions**.
-4. Scroll to **User Token Scopes** and add `users.profile:write`.
+4. Scroll to **User Token Scopes** and add all three scopes listed above.
 5. Click **Install to Workspace** at the top of the page and authorize.
 6. Copy the **User OAuth Token** (starts with `xoxp-`).
+
+> **Adding scopes later requires reinstalling the app** in the workspace to obtain an updated token. If you skip a scope you will see cryptic `missing_scope` errors at runtime — go back to **OAuth & Permissions**, add the missing scope, reinstall, and replace the token in `.env`.
 
 Open `.env` and paste the token:
 
@@ -61,11 +71,12 @@ SLACK_USER_TOKEN=xoxp-your-token-here
 
 ## Configuration
 
-The schedule lives in `config.json` at the project root. The file has three top-level keys:
+The schedule lives in `config.json` at the project root. The file has these top-level keys:
 
 ```json
 {
   "timezone": "Europe/Madrid",
+  "default_status": { ... },
   "weekly": [ ... ],
   "once": [ ... ]
 }
@@ -74,6 +85,37 @@ The schedule lives in `config.json` at the project root. The file has three top-
 ### `timezone`
 
 Any valid [IANA timezone identifier](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones), e.g. `"America/New_York"`, `"Europe/London"`, `"Asia/Tokyo"`. All `from`/`to` times in your rules are interpreted in this timezone.
+
+### `default_status` — Fallback when no rule matches (optional)
+
+When no `weekly` or `once` rule is active, the service can apply a default status instead of clearing Slack. Omit the key entirely to keep the v1 behavior (status is cleared).
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `emoji` | string | yes | Slack emoji code |
+| `text` | string | yes | Status text |
+| `presence` | `"away"` \| `"auto"` | no | Optional presence override (see below) |
+| `dnd` | `true` | no | Optional notification snooze (see below) |
+
+The default status never expires automatically (its `status_expiration` is always `0`); the service handles the transition when a scheduled rule takes over.
+
+**Example:**
+```json
+"default_status": {
+  "emoji": ":technologist:",
+  "text": "Available",
+  "presence": "auto"
+}
+```
+
+### Side-effects per rule — `presence` and `dnd`
+
+Both `weekly` and `once` rules accept two optional fields that take effect alongside the status change:
+
+| Field | Type | Description |
+|---|---|---|
+| `presence` | `"away"` \| `"auto"` | Calls `users.setPresence` on activation. Restored to `"auto"` on exit if the previous rule had set it. Omit it to leave presence untouched. |
+| `dnd` | `true` | Starts a notification snooze for the duration of the rule (until `to`, or until midnight if `to` is absent). Slack's minimum is **20 minutes** — shorter windows are skipped and logged as `DND_SKIP`. Ends on exit. |
 
 ### `weekly` — Recurring rules
 
@@ -87,6 +129,8 @@ Each entry applies on specific days of the week, optionally within a time window
 | `days` | string[] | yes | Days this rule applies: `"monday"` … `"sunday"` |
 | `from` | string (`HH:MM`) | no | Start of the time window (inclusive). Must be a 15-minute multiple. |
 | `to` | string (`HH:MM`) | no | End of the time window (exclusive). Must be a 15-minute multiple. |
+| `presence` | string | no | See **Side-effects** above |
+| `dnd` | boolean | no | See **Side-effects** above |
 
 If `from` and `to` are omitted the rule applies all day on the listed days.
 
@@ -124,6 +168,8 @@ Each entry applies on a single specific date and overrides any weekly rules for 
 | `date` | string (`YYYY-MM-DD`) | yes | The specific date this applies |
 | `from` | string (`HH:MM`) | no | Start of the time window (inclusive) |
 | `to` | string (`HH:MM`) | no | End of the time window (exclusive) |
+| `presence` | string | no | See **Side-effects** above |
+| `dnd` | boolean | no | See **Side-effects** above |
 
 **Example — PTO for an entire day:**
 ```json
@@ -143,7 +189,8 @@ When multiple rules could apply at the same time, the service picks the first ma
 2. `once` rule **all-day** — for today's date
 3. `weekly` rule **with** a time window — for the current time slot
 4. `weekly` rule **all-day** — for today's day of week
-5. No match → Slack status is cleared
+5. `default_status` if configured — applied as a fallback
+6. No match and no default → Slack status is cleared
 
 Within the same priority level, the **first rule in the array wins**.
 
@@ -218,12 +265,20 @@ Open `editor/index.html` directly in your browser (double-click it in Explorer, 
 
 Click the folder icon (📁) at the top of the **Config** section and pick your `config.json`. In Chrome and Edge (File System Access API supported), the editor remembers the file between sessions and can save directly back to disk. In other browsers, you download the updated file and replace `config.json` manually.
 
+### Default status
+
+- The **Default Status** section sits above Weekly Rules. Toggle **Enable** to define a fallback status that applies whenever no scheduled rule is active.
+- Fill in emoji and text. You can optionally pick a presence (`Away` / `Auto`) and check **Snooze notifications** to apply DND.
+- When the toggle is off, `default_status` is omitted from the JSON and the service falls back to clearing the Slack status (v1 behavior).
+
 ### Weekly rules
 
 - Click **+ Add rule** to create a new weekly rule.
 - Click the day pills (L M X J V S D) to toggle which days the rule applies.
 - Enter the emoji code in `:colon-format:` (e.g. `:house:`, `:office:`). Standard Unicode emoji are not accepted here — Slack requires the colon format.
 - Enable **Time range** to restrict the rule to a specific window. Times snap to 15-minute intervals.
+- Use the **presence selector** to force Slack to "away" or "auto" while this rule is active. Leave as `— (no change)` to skip the presence call entirely.
+- Check **Snooze notifications** to start a DND snooze for the duration of the rule. If the time range is shorter than 20 minutes a warning appears — Slack will reject the snooze call.
 - Rules are applied in list order — drag or re-add rules to change priority.
 
 ### Once entries
@@ -261,13 +316,28 @@ The service never reads `config.json` automatically after startup — the reload
 
 ## Logs
 
-The service appends a line to `logs/status.log` every time the Slack status changes:
+The service appends a line to `logs/status.log` every time the Slack status changes. Each side-effect (presence, DND) gets its own line so failures can be tracked independently:
 
 ```
 2026-05-11T09:00:00.000Z SET emoji=:house: text=WFH httpStatus=200
+2026-05-11T09:00:00.123Z PRESENCE presence=auto httpStatus=200
 2026-05-11T13:00:00.000Z SET emoji=:fork_and_knife: text=Lunch httpStatus=200
+2026-05-11T13:00:00.456Z DND_START minutes=60 httpStatus=200
 2026-05-11T14:00:00.000Z CLEAR emoji= text= httpStatus=200
+2026-05-11T14:00:00.789Z DND_END httpStatus=200
 ```
+
+Action types:
+
+| Action | Meaning |
+|---|---|
+| `SET` | A new status was applied (scheduled rule or `default_status`) |
+| `CLEAR` | Status was cleared (no rule active and no default) |
+| `PRESENCE` | `users.setPresence` was called |
+| `DND_START` | Notification snooze started |
+| `DND_END` | Notification snooze ended |
+| `DND_SKIP` | Snooze skipped because the duration was below Slack's 20-minute minimum |
+| `RELOAD_ERROR` | Config reload failed |
 
 The log is capped at 500 lines; older entries are trimmed automatically.
 

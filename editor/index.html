@@ -230,6 +230,47 @@
       color: #bbb;
     }
 
+    /* ── Side effects row ──────────────────────────────────── */
+
+    .side-effects-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .presence-select {
+      padding: 7px 8px;
+      border: 1.5px solid #d5d9e0;
+      border-radius: 6px;
+      font-size: 13px;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.12s;
+    }
+
+    .presence-select:focus {
+      outline: none;
+      border-color: #4f6ef7;
+      box-shadow: 0 0 0 3px rgba(79,110,247,0.12);
+    }
+
+    .dnd-warning {
+      font-size: 11px;
+      color: #92400e;
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      border-radius: 4px;
+      padding: 2px 8px;
+      white-space: nowrap;
+    }
+
+    .dnd-warning.hidden { display: none; }
+
+    /* ── Generic utility ───────────────────────────────────── */
+
+    .rule-card.hidden { display: none; }
+
     /* ── Delete button ─────────────────────────────────────── */
 
     .btn-delete {
@@ -540,35 +581,6 @@
 <main>
   <section>
     <div class="section-header">
-      <h2>Weekly Rules</h2>
-      <button class="btn-add" id="add-weekly">+ Add rule</button>
-    </div>
-    <div id="weekly-list"></div>
-  </section>
-
-  <section style="margin-top: 32px;">
-    <div class="section-header">
-      <h2>Once Entries</h2>
-      <button class="btn-add" id="add-once">+ Add entry</button>
-    </div>
-    <div id="once-list"></div>
-  </section>
-
-  <section style="margin-top: 32px;">
-    <div class="section-header">
-      <h2>Preview Simulator</h2>
-    </div>
-    <div class="sim-panel">
-      <div class="sim-controls">
-        <div id="sim-day-pills" class="day-pills"></div>
-        <select id="sim-time" class="sim-time-select"></select>
-      </div>
-      <div id="sim-result" class="sim-result no-match">No active status</div>
-    </div>
-  </section>
-
-  <section style="margin-top: 32px;">
-    <div class="section-header">
       <h2>Config</h2>
     </div>
     <div class="export-panel">
@@ -595,6 +607,62 @@
           <button type="button" id="btn-export" class="btn-secondary">Export</button>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section style="margin-top: 32px;">
+    <div class="section-header">
+      <h2>Preview Simulator</h2>
+    </div>
+    <div class="sim-panel">
+      <div class="sim-controls">
+        <input type="date" id="sim-date" class="sim-time-select">
+        <select id="sim-time" class="sim-time-select"></select>
+      </div>
+      <div id="sim-result" class="sim-result no-match">No active status</div>
+    </div>
+  </section>
+
+  <section style="margin-top: 32px;">
+    <div class="section-header">
+      <h2>Once Entries</h2>
+      <button class="btn-add" id="add-once">+ Add entry</button>
+    </div>
+    <div id="once-list"></div>
+  </section>
+
+  <section style="margin-top: 32px;">
+    <div class="section-header">
+      <h2>Weekly Rules</h2>
+      <button class="btn-add" id="add-weekly">+ Add rule</button>
+    </div>
+    <div id="weekly-list"></div>
+  </section>
+
+  <section style="margin-top: 32px;">
+    <div class="section-header">
+      <h2>Default Status</h2>
+      <label class="toggle-label">
+        <input type="checkbox" id="default-enabled" class="toggle-cb">
+        <span>Enable</span>
+      </label>
+    </div>
+    <div id="default-body" class="rule-card hidden">
+      <div class="rule-body">
+        <div class="fields-row">
+          <input type="text" id="default-emoji" class="emoji-input" placeholder=":emoji:">
+          <input type="text" id="default-text"  class="text-input"  placeholder="Status text">
+        </div>
+        <div id="default-side-effects"></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="margin-top: 32px;">
+    <div class="section-header">
+      <h2>Raw View</h2>
+    </div>
+    <div class="export-panel">
       <pre id="json-preview" class="json-preview"></pre>
     </div>
   </section>
@@ -607,12 +675,16 @@
     weekly: [],
     once: [],
   };
+  // config.default_status is omitted when disabled and present as
+  // { emoji, text, presence?, dnd? } when enabled.
 
   const FSAA = typeof window.showOpenFilePicker === 'function';
   let fileHandle = null;
   let lastFile   = null;
 
   // ── Constants ───────────────────────────────────────────────
+  const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
   const DAY_PILLS = [
     { label: 'L', value: 'monday' },
     { label: 'M', value: 'tuesday' },
@@ -675,9 +747,10 @@
   }
 
   // ── File operations ─────────────────────────────────────────
-  function setPathDisplay(name) {
-    localStorage.setItem('configFileName', name);
-    document.getElementById('config-path').value = name;
+  function setPathDisplay(name, fullPath) {
+    const display = fullPath || name;
+    localStorage.setItem('configFileName', display);
+    document.getElementById('config-path').value = display;
   }
 
   async function applyFile(file) {
@@ -687,7 +760,13 @@
       config.weekly   = Array.isArray(loaded.weekly) ? loaded.weekly : [];
       config.once     = Array.isArray(loaded.once)   ? loaded.once   : [];
       config.timezone = loaded.timezone || config.timezone;
+      if (loaded.default_status && typeof loaded.default_status === 'object') {
+        config.default_status = loaded.default_status;
+      } else {
+        delete config.default_status;
+      }
       document.getElementById('timezone-input').value = config.timezone;
+      renderDefault();
       renderWeekly();
       renderOnce();
     } catch (err) {
@@ -805,6 +884,84 @@
     return sel;
   }
 
+  function buildPresenceSelect(current) {
+    const sel = document.createElement('select');
+    sel.className = 'presence-select';
+    const options = [
+      { value: '',     label: '— (no change)' },
+      { value: 'away', label: 'Away' },
+      { value: 'auto', label: 'Auto' },
+    ];
+    for (const { value, label } of options) {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = label;
+      if (value === (current ?? '')) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    return sel;
+  }
+
+  function ruleDndWarning(item) {
+    if (!item.dnd) return null;
+    if (!item.from || !item.to) return null;
+    const [fh, fm] = item.from.split(':').map(Number);
+    const [th, tm] = item.to.split(':').map(Number);
+    const minutes = (th * 60 + tm) - (fh * 60 + fm);
+    return minutes < 20 ? minutes : null;
+  }
+
+  function buildSideEffectsRow(item) {
+    const row = document.createElement('div');
+    row.className = 'side-effects-row';
+
+    const presenceSelect = buildPresenceSelect(item.presence);
+    presenceSelect.title = 'Slack presence';
+    presenceSelect.addEventListener('change', () => {
+      if (presenceSelect.value) item.presence = presenceSelect.value;
+      else delete item.presence;
+      updatePreview();
+    });
+
+    const dndLabel = document.createElement('label');
+    dndLabel.className = 'toggle-label';
+    const dndCb = document.createElement('input');
+    dndCb.type = 'checkbox';
+    dndCb.className = 'toggle-cb';
+    dndCb.checked = !!item.dnd;
+    const dndSpan = document.createElement('span');
+    dndSpan.textContent = 'Snooze notifications';
+    dndLabel.appendChild(dndCb);
+    dndLabel.appendChild(dndSpan);
+
+    const warning = document.createElement('span');
+    warning.className = 'dnd-warning hidden';
+
+    function refreshWarning() {
+      const mins = ruleDndWarning(item);
+      if (mins !== null) {
+        warning.textContent = `⚠ Snooze ${mins} min — Slack requires ≥20`;
+        warning.classList.remove('hidden');
+      } else {
+        warning.classList.add('hidden');
+      }
+    }
+
+    dndCb.addEventListener('change', () => {
+      if (dndCb.checked) item.dnd = true;
+      else delete item.dnd;
+      refreshWarning();
+      updatePreview();
+    });
+
+    row.appendChild(presenceSelect);
+    row.appendChild(dndLabel);
+    row.appendChild(warning);
+
+    refreshWarning();
+    return { row, refreshWarning };
+  }
+
   function updatePreview() {
     document.getElementById('json-preview').textContent = JSON.stringify(config, null, 2);
     runSimulator();
@@ -817,8 +974,18 @@
     return `${h}:${floored.toString().padStart(2, '0')}`;
   }
 
-  function simulate(day, time) {
-    const t = floorTo15(time);
+  function simulate(date, time) {
+    const t   = floorTo15(time);
+    const day = DAY_NAMES[new Date(date + 'T12:00:00').getDay()];
+
+    for (const entry of config.once) {
+      if (entry.date === date && entry.from && t >= entry.from && t < entry.to)
+        return entry;
+    }
+    for (const entry of config.once) {
+      if (entry.date === date && !entry.from)
+        return entry;
+    }
     for (const rule of config.weekly) {
       if (rule.days.includes(day) && rule.from && t >= rule.from && t < rule.to)
         return rule;
@@ -831,14 +998,18 @@
   }
 
   function runSimulator() {
-    const activePill = document.querySelector('#sim-day-pills .pill.active');
+    const dateInput = document.getElementById('sim-date');
     const timeSelect = document.getElementById('sim-time');
     const resultEl   = document.getElementById('sim-result');
-    if (!activePill || !timeSelect || !resultEl) return;
+    if (!dateInput || !timeSelect || !resultEl) return;
 
-    const rule = simulate(activePill.dataset.day, timeSelect.value);
+    const rule = simulate(dateInput.value, timeSelect.value);
     if (rule) {
       resultEl.textContent = `${rule.emoji}  ${rule.text}`;
+      resultEl.classList.remove('no-match');
+    } else if (config.default_status && config.default_status.emoji && config.default_status.text) {
+      const d = config.default_status;
+      resultEl.textContent = `${d.emoji}  ${d.text}  (default)`;
       resultEl.classList.remove('no-match');
     } else {
       resultEl.textContent = 'No active status';
@@ -849,25 +1020,33 @@
   function runValidation() {
     let allValid = true;
 
+    const defaultCard = document.getElementById('default-body');
+    if (config.default_status) {
+      const invalid = !config.default_status.emoji?.trim()
+        || !config.default_status.text?.trim();
+      defaultCard.classList.toggle('invalid', invalid);
+      if (invalid) allValid = false;
+    } else {
+      defaultCard.classList.remove('invalid');
+    }
+
     for (const rule of config.weekly) {
-      const card = document.querySelector(`.rule-card[data-id="${rule.id}"]`);
-      if (!card) continue;
       const invalid = rule.days.length === 0
         || !rule.emoji.trim()
         || !rule.text.trim()
         || !!(rule.from && rule.to && rule.from >= rule.to);
-      card.classList.toggle('invalid', invalid);
       if (invalid) allValid = false;
+      const card = document.querySelector(`.rule-card[data-id="${rule.id}"]`);
+      if (card) card.classList.toggle('invalid', invalid);
     }
 
     for (const entry of config.once) {
-      const card = document.querySelector(`.rule-card[data-id="${entry.id}"]`);
-      if (!card) continue;
       const invalid = !entry.emoji.trim()
         || !entry.text.trim()
         || !!(entry.from && entry.to && entry.from >= entry.to);
-      card.classList.toggle('invalid', invalid);
       if (invalid) allValid = false;
+      const card = document.querySelector(`.rule-card[data-id="${entry.id}"]`);
+      if (card) card.classList.toggle('invalid', invalid);
     }
 
     document.getElementById('btn-save').disabled   = !allValid;
@@ -876,22 +1055,9 @@
   }
 
   function initSimulator() {
-    const pillsContainer = document.getElementById('sim-day-pills');
-    for (const { label, value } of DAY_PILLS) {
-      const pill = document.createElement('button');
-      pill.type = 'button';
-      pill.className = 'pill';
-      pill.textContent = label;
-      pill.title = value.charAt(0).toUpperCase() + value.slice(1);
-      pill.dataset.day = value;
-      pill.addEventListener('click', () => {
-        pillsContainer.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
-        pill.classList.add('active');
-        runSimulator();
-      });
-      pillsContainer.appendChild(pill);
-    }
-    pillsContainer.firstElementChild.classList.add('active');
+    const dateInput = document.getElementById('sim-date');
+    dateInput.value = todayStr();
+    dateInput.addEventListener('change', runSimulator);
 
     const timeSelect = document.getElementById('sim-time');
     for (const t of TIME_OPTIONS) {
@@ -903,6 +1069,51 @@
     timeSelect.value = '09:00';
     timeSelect.addEventListener('change', runSimulator);
   }
+
+  // ── Default status ──────────────────────────────────────────
+  function renderDefault() {
+    const enabled  = !!config.default_status;
+    const toggle   = document.getElementById('default-enabled');
+    const body     = document.getElementById('default-body');
+    const emojiEl  = document.getElementById('default-emoji');
+    const textEl   = document.getElementById('default-text');
+    const sideHost = document.getElementById('default-side-effects');
+
+    toggle.checked = enabled;
+    body.classList.toggle('hidden', !enabled);
+
+    if (enabled) {
+      emojiEl.value = config.default_status.emoji || '';
+      textEl.value  = config.default_status.text  || '';
+      sideHost.innerHTML = '';
+      const { row } = buildSideEffectsRow(config.default_status);
+      sideHost.appendChild(row);
+    } else {
+      sideHost.innerHTML = '';
+    }
+  }
+
+  document.getElementById('default-enabled').addEventListener('change', (e) => {
+    if (e.target.checked) {
+      if (!config.default_status) config.default_status = { emoji: '', text: '' };
+    } else {
+      delete config.default_status;
+    }
+    renderDefault();
+    updatePreview();
+  });
+
+  document.getElementById('default-emoji').addEventListener('input', (e) => {
+    if (!config.default_status) return;
+    config.default_status.emoji = e.target.value;
+    updatePreview();
+  });
+
+  document.getElementById('default-text').addEventListener('input', (e) => {
+    if (!config.default_status) return;
+    config.default_status.text = e.target.value;
+    updatePreview();
+  });
 
   // ── Render ──────────────────────────────────────────────────
   function renderWeekly() {
@@ -987,19 +1198,23 @@
     fieldsRow.appendChild(toggleLabel);
     body.appendChild(fieldsRow);
 
+    // ── Side effects row ──
+    const { row: sideEffectsRow, refreshWarning } = buildSideEffectsRow(rule);
+    body.appendChild(sideEffectsRow);
+
     // ── Time row ──
     const timeRow = document.createElement('div');
     timeRow.className = 'time-row' + (toggleCb.checked ? '' : ' hidden');
 
     const fromSelect = buildTimeSelect(rule.from || '09:00');
-    fromSelect.addEventListener('change', () => { rule.from = fromSelect.value; updatePreview(); });
+    fromSelect.addEventListener('change', () => { rule.from = fromSelect.value; refreshWarning(); updatePreview(); });
 
     const sep = document.createElement('span');
     sep.className = 'time-sep';
     sep.textContent = '→';
 
     const toSelect = buildTimeSelect(rule.to || '10:00');
-    toSelect.addEventListener('change', () => { rule.to = toSelect.value; updatePreview(); });
+    toSelect.addEventListener('change', () => { rule.to = toSelect.value; refreshWarning(); updatePreview(); });
 
     timeRow.appendChild(fromSelect);
     timeRow.appendChild(sep);
@@ -1016,6 +1231,7 @@
         delete rule.from;
         delete rule.to;
       }
+      refreshWarning();
       updatePreview();
     });
 
@@ -1120,19 +1336,23 @@
     fieldsRow.appendChild(toggleLabel);
     body.appendChild(fieldsRow);
 
+    // ── Side effects row ──
+    const { row: sideEffectsRow, refreshWarning } = buildSideEffectsRow(entry);
+    body.appendChild(sideEffectsRow);
+
     // ── Time row ──
     const timeRow = document.createElement('div');
     timeRow.className = 'time-row' + (toggleCb.checked ? '' : ' hidden');
 
     const fromSelect = buildTimeSelect(entry.from || '09:00');
-    fromSelect.addEventListener('change', () => { entry.from = fromSelect.value; updatePreview(); });
+    fromSelect.addEventListener('change', () => { entry.from = fromSelect.value; refreshWarning(); updatePreview(); });
 
     const sep = document.createElement('span');
     sep.className = 'time-sep';
     sep.textContent = '→';
 
     const toSelect = buildTimeSelect(entry.to || '10:00');
-    toSelect.addEventListener('change', () => { entry.to = toSelect.value; updatePreview(); });
+    toSelect.addEventListener('change', () => { entry.to = toSelect.value; refreshWarning(); updatePreview(); });
 
     timeRow.appendChild(fromSelect);
     timeRow.appendChild(sep);
@@ -1149,6 +1369,7 @@
         delete entry.from;
         delete entry.to;
       }
+      refreshWarning();
       updatePreview();
     });
 
@@ -1221,6 +1442,7 @@
   });
 
   // ── Init ────────────────────────────────────────────────────
+  renderDefault();
   renderWeekly();
   renderOnce();
   initSimulator();
@@ -1228,8 +1450,12 @@
 
   // Restore file association from previous session
   (async () => {
-    const name = localStorage.getItem('configFileName');
-    if (name) document.getElementById('config-path').value = name;
+    const params   = new URLSearchParams(window.location.search);
+    const urlPath  = params.get('configPath');
+    const stored   = localStorage.getItem('configFileName');
+    const display  = urlPath || stored;
+    if (display) document.getElementById('config-path').value = display;
+    if (urlPath) localStorage.setItem('configFileName', urlPath);
     fileHandle = await getStoredHandle();
   })();
 </script>

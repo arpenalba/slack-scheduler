@@ -37,15 +37,24 @@ try {
 
 let activeRule = undefined; // undefined = not yet evaluated, null = cleared
 
+function resolveRule(evaluated, config) {
+  if (evaluated) return evaluated;
+  if (config.default_status) {
+    return { ...config.default_status, id: '__default__', status_expiration: 0 };
+  }
+  return null;
+}
+
 async function applyRule(rule) {
   const timestamp = new Date().toISOString();
   const action    = rule ? 'SET' : 'CLEAR';
   const emoji     = rule ? rule.emoji : '';
   const text      = rule ? rule.text  : '';
+  const prevRule  = activeRule ?? null;
   try {
     const response = rule
-      ? await setStatus(rule, config)
-      : await clearStatus();
+      ? await setStatus(rule, config, prevRule)
+      : await clearStatus(prevRule);
     log({ timestamp, action, emoji, text, httpStatus: response.status });
     activeRule = rule;
   } catch (err) {
@@ -63,7 +72,7 @@ async function reloadConfig() {
     config = require(configPath);
     activeRule = undefined;
     const now = dayjs().tz(config.timezone);
-    await applyRule(evaluate(now, config));
+    await applyRule(resolveRule(evaluate(now, config), config));
     console.log('Config reloaded.');
   } catch (err) {
     console.error('Failed to reload config:', err.message);
@@ -74,12 +83,43 @@ async function reloadConfig() {
 // ── console menu ──────────────────────────────────────────────────────────────
 
 function showMenu(rl) {
-  console.log('\n1) Open editor  2) Reload config  3) Quit');
-  rl.question('> ', async (answer) => {
+  const editorPath = path.resolve(__dirname, '../editor/index.html');
+  console.log(`
+  ╔═══════════════════════════════════════════════════════════════╗
+  ║                                                               ║
+  ║  ███████╗██╗      █████╗  ██████╗██╗  ██╗███████╗███████╗   ║
+  ║  ██╔════╝██║     ██╔══██╗██╔════╝██║ ██╔╝██╔════╝██╔════╝   ║
+  ║  ███████╗██║     ███████║██║     █████╔╝ ███████╗███████╗   ║
+  ║  ╚════██║██║     ██╔══██║██║     ██╔═██╗ ╚════██║╚════██║   ║
+  ║  ███████║███████╗██║  ██║╚██████╗██║  ██╗███████║███████║   ║
+  ║  ╚══════╝╚══════╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚══════╝   ║
+  ║                                                               ║
+  ║              ✓ Slack Status Scheduler Running...             ║
+  ║                                                               ║
+  ║  Config editor found in:                                     ║
+  ║  ${editorPath}
+  ║                                                               ║
+  ╚═══════════════════════════════════════════════════════════════╝
+`);
+  console.log('  1) Open editor   2) Reload config   3) Quit\n');
+  rl.question('  > ', async (answer) => {
     switch (answer.trim()) {
-      case '1':
-        open(pathToFileURL(path.join(__dirname, '../editor/index.html')).toString());
+      case '1': {
+        const configAbsPath = path.resolve(__dirname, '../config.json');
+        const editorBase    = pathToFileURL(path.join(__dirname, '../editor/index.html')).toString();
+        const editorUrl     = `${editorBase}?configPath=${encodeURIComponent(configAbsPath)}`;
+        const platform = process.platform;
+        const appArgs = platform === 'win32'
+          ? { app: { name: 'msedge' } }
+          : platform === 'darwin'
+          ? { app: { name: 'Microsoft Edge' } }
+          : { app: { name: 'microsoft-edge' } };
+        open(editorUrl, appArgs).catch(() => {
+          console.warn('Could not open editor in Edge. Trying default browser...');
+          open(editorUrl);
+        });
         break;
+      }
       case '2':
         await reloadConfig();
         break;
@@ -94,7 +134,7 @@ function showMenu(rl) {
 
 (async () => {
   const now = dayjs().tz(config.timezone);
-  await applyRule(evaluate(now, config));
+  await applyRule(resolveRule(evaluate(now, config), config));
 
   if (process.stdin.isTTY) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -105,11 +145,11 @@ function showMenu(rl) {
 // ── cron: every 15 min at :00 :15 :30 :45 ────────────────────────────────────
 
 cron.schedule('0,15,30,45 * * * *', async () => {
-  const now    = dayjs().tz(config.timezone);
-  const rule   = evaluate(now, config);
-  const prevId = activeRule?.id ?? null;
-  const nextId = rule?.id ?? null;
+  const now      = dayjs().tz(config.timezone);
+  const resolved = resolveRule(evaluate(now, config), config);
+  const prevId   = activeRule?.id ?? null;
+  const nextId   = resolved?.id ?? null;
   if (prevId !== nextId) {
-    await applyRule(rule);
+    await applyRule(resolved);
   }
 });
